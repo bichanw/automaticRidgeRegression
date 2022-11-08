@@ -27,6 +27,20 @@ function [kHat,hyperprs,CpriorInv] = autoSmoothRidgeRegress(dstruct,strtInds,opt
 %       .rho = exponential correlation space constant
 %       .nsevar = noise variance 
 %   CpriorInv = inverse of prior covariance matrix
+%
+% -----------------------
+% Details:  the innverse prior covariance is given by
+%
+%   C^-1 = alpha/(1-rho^2)[ 1     -rho
+%                         -rho  1 + rho^2 -rho
+%                                  ....
+%                                   -rho  1+rho^2 -rho
+%                                          -rho     1]
+%
+% This produces a cov matrix w/ exponential falloff:
+%    C(dt) = (1/alpha)*rho^(-|dt|) = (1/alpha) exp(dt*log(|dt|)).
+
+
 
 % ---- Parse intputs ----
 if nargin < 4, initprs=[]; end
@@ -58,8 +72,10 @@ Moffdiag = spdiags(vecs(:,2:3), [-1 1],nx,nx);  % off-diagonal terms
 if isempty(initprs)
     % run ridge regression to estimate alpha0 and nsevar0
     fprintf('Initializing with standard ridge regression:\n');
-    [~,alpha,nsevar] = autoRidgeRegress(dstruct.xx,dstruct.xy,dstruct.yy,dstruct.ny);
-    rho = .1;  % prior correlation
+    [~,hprs_ridge] = autoRidgeRegress_fixedpoint(dstruct, 1);
+    alpha = hprs_ridge.alpha; % ridge parameter
+    nsevar = hprs_ridge.nsevar; % output noise
+    rho = .5;  % prior correlation
 else
     alpha = initprs.alpha;
     rho = initprs.rho;
@@ -69,7 +85,6 @@ end
 % --- initialize some params for iterative fixed-point algorithm -------
 jcount = 1;      % counter for fixed-point algorithm
 dparams = inf;   % change in params from previous step (initialize to inf)
-lam0 = 1;        % initial value of ridge parameter
 
 % --- run fixed-point algorithm for maximizing marginal likelihood ------
 while (jcount <= opts.maxiter) && (dparams>opts.tol) && (alpha < opts.maxalpha)
@@ -124,11 +139,9 @@ function [mu,L] = compGaussianPosterior(xx,xy,nsevar,CpriorInv)
 % (Or, given dstruct.xx = X'*X; xy = X'*Y) and with
 % noise variance nsevar and prior inverse-covariance CpriorInv
 
-if nargout == 1
-    mu = (xx+nsevar*CpriorInv)\xy;
-else
+mu = (xx+nsevar*CpriorInv)\xy;
+if nargout > 1
     L = inv(xx./nsevar + CpriorInv);  % covariance
-    mu = L*(xy)/nsevar;  % mean
 end
 
 

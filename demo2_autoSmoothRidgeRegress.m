@@ -6,12 +6,11 @@
 % This prior corresponds to a Gaussian process prior with an exponential
 % covariance function.  The tridiagonal inverse covariance matrix is:
 %
-% C^-1 = (1/alpha)[ 1     -rho
-%                   -rho  1 + rho^2 -rho
-%                          ....
-%
-%                          -rho  1+rho^2 -rho
-%                                  -rho     1]
+%   C^-1 = alpha/(1-rho^2)[ 1     -rho
+%                         -rho  1 + rho^2 -rho
+%                                  ....
+%                                   -rho  1+rho^2 -rho
+%                                          -rho     1]
 % 
 % The covariance matrix has exponential falloff with shape rho^(-|dt|):
 %
@@ -87,8 +86,9 @@ imagesc(inv(Cinv_sm2)); title('smooth prior cov w/ breaks');
 xlabel('coeff #'); ylabel('coeff #');
 
 subplot(224)
+tt = 1:nk;
 plot(tt, k,'k--',tt, kridge,tt,ksm1,tt,ksm2);
-legend('true k','ridge', 'sm1', 'sm2');
+legend('true k','ridge', 'smooth1', 'smooth2');
 xlabel('coeff #')
 ylabel('coeff')
 
