@@ -10,13 +10,13 @@
 % 
 % Model
 % -----
-%         k ~ N(0,1/alpha)      % prior on weights
-%  y | x, k ~ N(x^T k, sigma^2) % linear-Gaussian observations
+%         k ~ N(0,1/alpha * I)      % prior on weights
+%  y | x, k ~ N(x^T k, nsevar) % linear-Gaussian observations
 %
 % Empirical Bayes inference:
 %
-% 1. alpha_hat = arg max_alpha P(Y | X, alpha);  
-% 2.     k_hat = arg max_k     P(k | Y, X, alpha_hat)
+% 1. [alpha_hat, nsevar_hat] = arg max P(Y | X, alpha,nsevar);  
+% 2.     k_hat = arg max_k  P(k | Y, X, alpha_hat)
 
 % set path
 addpath tools

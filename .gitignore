@@ -1,0 +1,17 @@
+# Compiled latex #
+###################
+*.aux
+*.log
+*.gz
+*.blg
+*.bbl
+*.toc
+*.out
+
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+._*
+*~
+*asv
