@@ -1,5 +1,5 @@
-function [khat,hprs] = autoRidgeRegress_VI(dstruct,lam0,opts)
-% "Automatic" ridge regression w/ variational inference for hyperparams 
+function [khat,hprs] = autoRidgeEfficient_fixedpoint(X,Y,lam0,opts)
+% "Automatic" ridge regression w/ fixed-point evidence optimization for hyperparams 
 %  
 % [khat,hprs] = autoRidgeRegression_fp(datastruct,lam0,opts)
 %
@@ -11,11 +11,8 @@ function [khat,hprs] = autoRidgeRegress_VI(dstruct,lam0,opts)
 %
 % INPUT:
 % -------
-%  dstruct - data structure with fields:
-%            .xx - stimulus autocovariance matrix X'*X
-%            .xy - stimulus-response cross-covariance X'*Y
-%            .yy - response variance Y'*Y
-%            .ny - number of samples 
+%   X - stimulus matrix (T x nx)
+%   Y - response matrix (T x ny)
 %   lam0 - initial value of the ratio of ridge parameter (OPTIONAL)
 %            (equal to noise variance divided by prior variance)
 %   opts - options stucture w fields  'maxiter' and 'tol' (OPTIONAL)
@@ -44,32 +41,36 @@ jcount = 1;  % counter
 dparams = inf;  % Change in params from previous step
 
 % extract sufficient statistics
-xx = dstruct.xx; 
-xy = dstruct.xy;
-yy = dstruct.yy;
-ny = dstruct.ny;
+xy = X'*Y;
+xx = X'*X;
+yy = Y'*Y;
+% dimensions of data
+nx = size(X,2);
+ny = size(Y,2);
+T = size(X,1);
+d = nx * ny;
+N = T * ny;
 
-nx= size(xx,1); % number of stimulus dimnesions
+
 Lmat = speye(nx);  % Diagonal matrix for prior
 
 % ------ Initialize alpha & nsevar using MAP estimate around lam0 ------
-kmap0 = (xx + lam0*Lmat)\xy;  % MAP estimate given lam0
-nsevar = yy - 2*kmap0'*xy + kmap0'*xx*kmap0; % 1st estimate for nsevar: var(y-x*kmap0); 
-alpha = lam0/nsevar;
+kmap0  = (xx + lam0*Lmat)\xy;  % MAP estimate given lam0
+nsevar = sum(sum((Y - X*kmap0).^2)); % 1st estimate for nsevar: var(y-x*kmap0); 
+alpha  = lam0/nsevar;
+Y_norm = sum(sum(Y.^2));
 
 % ------ Run fixed-point algorithm  ------------
 while (jcount <= opts.maxiter) && (dparams>opts.tol) && (alpha <= MAXALPHA)
-    CpriorInv = Lmat*alpha;
     
-    Cpost = inv(xx/nsevar + CpriorInv);  % posterior covariance this needs to be replaced
-    
-    mupost = (Cpost*xy)/nsevar; % posterior mean - calculate directily
+    Cpost_small = inv(xx/nsevar + Lmat*alpha);  % posterior covariance before taking kronecker with I_ny
 
-
-    alphanew = (nx- alpha.*trace(Cpost))./sum(mupost.^2); % update for alpha
     
-    numerator = yy - 2*mupost'*xy + mupost'*xx*mupost;
-    nsevarnew = sum(numerator)./(ny-sum(1-alpha*diag(Cpost))); 
+    mupost = vec(Cpost_small / nsevar * xy); % posterior mean
+    alphanew = (d - alpha*ny.*trace(Cpost_small))./sum(mupost.^2); % update for alpha
+    
+    numerator = Y_norm - 2*mupost'*vec(xy) + mupost'*vec(xx * reshape(mupost,nx,ny));
+    nsevarnew = sum(numerator)./(N - d + alpha * ny * trace(Cpost_small));
 
     % update counter, alpha & nsevar
     dparams = norm([alphanew;nsevarnew]-[alpha;nsevar]);
@@ -93,5 +94,8 @@ else
 end
 
 % Put hyperparameter estimates into struct
-hprs.alpha = alpha;
+hprs.alpha  = alpha;
 hprs.nsevar = nsevar;
+hprs.lambda = alpha * nsevar;
+
+end

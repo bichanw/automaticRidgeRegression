@@ -26,7 +26,7 @@ addpath inference/
 
 nk = 100;     % number of regression coefficients 
 nsamps = 200; % number of samples
-signse = 3;   % stdev of added noise
+signse = 5;   % stdev of added noise
 
 % make filter
 tt = (1:nk)'; % coefficient indices
@@ -47,13 +47,39 @@ dd.yy = y'*y;
 dd.nx = nk;
 dd.ny = nsamps;
 
+% real data
+% dd.xx = kron(eye(size(Yout,2)),XX);
+% dd.xy = vec(XY);
+% dd.yy = sum(sum(Yout.^2));
+% dd.nx = numel(dd.xy);
+% dd.ny = prod(size(Yout));
+
 % Compute ML estimate
 kml = dd.xx\dd.xy;  
 
 % Compute EB ridge regression estimate
-alpha0 = 1; % initial guess at alpha
+alpha0 = 10; % initial guess at alpha
 [kridge,hprs_hat] = autoRidgeRegress_fixedpoint(dd,alpha0);
 
+
+% [kridge,hprs_hat] = autoRidgeRegress_fixedpoint(dd,alpha0);
+% autoRidgeRegress: jcount=2, alpha=407.356, nsevar=1.075, dparams=204675.069143
+% autoRidgeRegress: jcount=3, alpha=334.318, nsevar=1.059, dparams=73.038710
+% autoRidgeRegress: jcount=4, alpha=317.117, nsevar=1.057, dparams=17.200295
+% autoRidgeRegress: jcount=5, alpha=312.791, nsevar=1.057, dparams=4.326219
+% autoRidgeRegress: jcount=6, alpha=311.682, nsevar=1.056, dparams=1.108718
+% autoRidgeRegress: jcount=7, alpha=311.397, nsevar=1.056, dparams=0.285543
+% autoRidgeRegress: jcount=8, alpha=311.323, nsevar=1.056, dparams=0.073633
+% autoRidgeRegress: jcount=9, alpha=311.304, nsevar=1.056, dparams=0.018994
+% autoRidgeRegress: jcount=10, alpha=311.299, nsevar=1.056, dparams=0.004900
+% autoRidgeRegress: jcount=11, alpha=311.298, nsevar=1.056, dparams=0.001264
+% autoRidgeRegress: jcount=12, alpha=311.298, nsevar=1.056, dparams=0.000326
+% autoRidgeRegress: jcount=13, alpha=311.298, nsevar=1.056, dparams=0.000084
+% autoRidgeRegress: jcount=14, alpha=311.298, nsevar=1.056, dparams=0.000022
+% autoRidgeRegress: jcount=15, alpha=311.298, nsevar=1.056, dparams=0.000006
+% autoRidgeRegress: jcount=16, alpha=311.298, nsevar=1.056, dparams=0.000001
+% autoRidgeRegress: jcount=17, alpha=311.298, nsevar=1.056, dparams=0.000000
+% Finished autoRidgeRegression in #17 steps
 
 %% 3. Compare performance & make plots
 
