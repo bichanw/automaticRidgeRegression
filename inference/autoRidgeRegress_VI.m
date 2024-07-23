@@ -1,5 +1,5 @@
-function [khat,hprs] = autoRidgeRegress_fixedpoint(dstruct,lam0,opts)
-% "Automatic" ridge regression w/ fixed-point evidence optimization for hyperparams 
+function [khat,hprs] = autoRidgeRegress_VI(dstruct,opts)
+% "Automatic" ridge regression w/ variational inference for hyperparams 
 %  
 % [khat,hprs] = autoRidgeRegression_fp(datastruct,lam0,opts)
 %
@@ -32,9 +32,6 @@ MAXALPHA = 1e6; % Maximum allowed value for prior precision
 
 % Check input arguments
 if nargin < 2
-    lam0 = 10;
-end
-if nargin < 3
     opts.maxiter = 100;
     opts.tol = 1e-6;
 end
@@ -44,6 +41,8 @@ jcount = 1;  % counter
 dparams = inf;  % Change in params from previous step
 
 % extract sufficient statistics
+x  = dstruct.x;
+y  = dstruct.y;
 xx = dstruct.xx; 
 xy = dstruct.xy;
 yy = dstruct.yy;
@@ -51,41 +50,62 @@ ny = dstruct.ny;
 
 nx= size(xx,1); % number of stimulus dimnesions
 Lmat = speye(nx);  % Diagonal matrix for prior
+N = ny; % number of samples
+d = dstruct.nx;
 
-% ------ Initialize alpha & nsevar using MAP estimate around lam0 ------
-kmap0 = (xx + lam0*Lmat)\xy;  % MAP estimate given lam0
-nsevar = yy - 2*kmap0'*xy + kmap0'*xx*kmap0; % 1st estimate for nsevar: var(y-x*kmap0); 
-alpha = lam0/nsevar;
 
-% ------ Run fixed-point algorithm  ------------
-while (jcount <= opts.maxiter) && (dparams>opts.tol) && (alpha <= MAXALPHA)
-    CpriorInv = Lmat*alpha;
+% initialize hyperparameters struct
+% using non-informative gamma prior
+ELBO_no_const = -inf; % Evidence lower bound
+d_ELBO = inf;
+c_0 = .001;
+d_0 = .001;
+d_vi = .001;
+a_0 = .001;
+b_0 = .001;
+
+
+
+% VI parameters not affected by interations
+c_vi = c_0 + d / 2;
+a_vi = a_0 + N / 2;
+
+
+to_save.ELBO = [];
+% ------ Run variational inference algorithm  ------------
+while (jcount <= opts.maxiter) && (abs(d_ELBO) >= opts.tol)
     
-    Cpost = inv(xx/nsevar + CpriorInv);  % posterior covariance this needs to be replaced
-    
-    mupost = (Cpost*xy)/nsevar; % posterior mean - calculate directily
+    % update q(beta, sigma2)
+    inv_V_vi = (c_vi / d_vi) * speye(d) + xx;
+    V_vi = inv(inv_V_vi);
+    beta_vi = inv_V_vi \ xy;
+    b_vi = b_0 + 0.5 * (yy - beta_vi' * inv_V_vi * beta_vi);
+
+    % update q(alpha)
+    d_vi = d_0 + (beta_vi'*beta_vi * a_vi / b_vi + trace(V_vi)) / 2;
 
 
-    alphanew = (nx- alpha.*trace(Cpost))./sum(mupost.^2); % update for alpha
-    
-    numerator = yy - 2*mupost'*xy + mupost'*xx*mupost;
-    nsevarnew = sum(numerator)./(ny-sum(1-alpha*diag(Cpost))); 
+    % calculate ELBO for convergence
+    ELBO_old = ELBO_no_const;
+    ELBO_no_const = - 0.5 * (a_vi / b_vi * (yy - 2 * beta_vi' * xy + beta_vi' * xx * beta_vi) + sum(sum(x .* (x * V_vi))))...
+                    - my_logdet(inv_V_vi) / 2 - b_0 * a_vi / b_vi + gammaln(a_vi) - a_vi * log(b_vi) + a_vi ...
+                    - gammaln(c_vi) - c_vi * log(d_vi);
+    d_ELBO = ELBO_no_const - ELBO_old;
+    to_save.ELBO = [to_save.ELBO ELBO_no_const];
 
-    % update counter, alpha & nsevar
-    dparams = norm([alphanew;nsevarnew]-[alpha;nsevar]);
-    jcount = jcount+1;
-    alpha = alphanew;
-    nsevar = nsevarnew;
+    % iterations
+    jcount = jcount + 1;
+    fprintf('Iteration %d: ELBO = %.3f\n', jcount, ELBO_no_const);
 
-    fprintf('autoRidgeRegress: jcount=%d, alpha=%.3f, nsevar=%.3f, dparams=%f\n', ...
-        jcount, alpha, nsevar, dparams);
 end
-khat = (xx + alpha*nsevar*Lmat)\(xy); % final estimate (posterior mean after last update)
 
-if alpha >= MAXALPHA
-    fprintf(1, 'Finished autoRidgeRegression: filter is all-zeros\n');
-    khat = mupost*0;  % Prior variance is delta function
-elseif jcount < opts.maxiter
+khat = beta_vi; % final estimate (posterior mean after last update)
+hprs.nsevar = b_vi / a_vi;
+hprs.alpha = c_vi / d_vi / hprs.nsevar;
+
+
+
+if jcount < opts.maxiter
     fprintf('Finished autoRidgeRegression in #%d steps\n', jcount);
 else
     fprintf(1, 'Stopped autoRidgeRegression: MAXITER (%d) steps; dparams last step: %f\n', ...
@@ -93,5 +113,4 @@ else
 end
 
 % Put hyperparameter estimates into struct
-hprs.alpha = alpha;
-hprs.nsevar = nsevar;
+hprs.ELBO = to_save.ELBO;

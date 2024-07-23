@@ -1,5 +1,5 @@
-function [khat,hprs] = autoRidgeRegress_VI(dstruct,lam0,opts)
-% "Automatic" ridge regression w/ variational inference for hyperparams 
+function [khat,hprs] = autoRidgeRegress_fixedpoint(dstruct,lam0,opts)
+% "Automatic" ridge regression w/ fixed-point evidence optimization for hyperparams 
 %  
 % [khat,hprs] = autoRidgeRegression_fp(datastruct,lam0,opts)
 %

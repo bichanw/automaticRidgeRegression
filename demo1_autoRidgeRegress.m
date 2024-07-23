@@ -41,6 +41,8 @@ y = Xdsgn*k + randn(nsamps,1)*signse;
 %% 2.  Compute ML and ridge regression estimates
 
 % Compute sufficient statistics
+dd.x = Xdsgn;
+dd.y = y;
 dd.xx = Xdsgn'*Xdsgn;   
 dd.xy = Xdsgn'*y;
 dd.yy = y'*y;
@@ -59,8 +61,21 @@ kml = dd.xx\dd.xy;
 
 % Compute EB ridge regression estimate
 alpha0 = 10; % initial guess at alpha
+[k_vi,hprs_vi] = autoRidgeRegress_VI(dd);
+[k_vi2,hprs_vi2] = autoRidgeRegress_VI(dd);
+% kml = k_vi;
 [kridge,hprs_hat] = autoRidgeRegress_fixedpoint(dd,alpha0);
+hprs_vi
+hprs_hat 
 
+[w, V, invV, logdetV, an, bn, E_a, L] = vb_linear_fit(Xdsgn, y);
+
+% ax = np; plt_cmp_vectors([kml k_vi kridge],[],'lines',ax);ef;
+% plt_cmp_vectors([kml k_vi kridge w],{'ml','vi','fp','vid'});ef;
+% plt_cmp_vectors([k_vi k_vi2 kridge w],{'vi1','vi2','fp','vid'},'hist');ef;
+plt_cmp_vectors([k_vi kridge],{'vi','fixed point'},'lines');ef;
+
+return
 
 % [kridge,hprs_hat] = autoRidgeRegress_fixedpoint(dd,alpha0);
 % autoRidgeRegress: jcount=2, alpha=407.356, nsevar=1.075, dparams=204675.069143
